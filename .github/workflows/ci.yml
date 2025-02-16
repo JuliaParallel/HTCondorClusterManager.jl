@@ -11,11 +11,16 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 permissions:
   contents: read
+  packages: read
+env:
+  MY_GCR_NAMESPACE: 'juliaparallel'
+  MY_GCR_IMAGENAME: 'dask-jobqueue-ci-images'
 jobs:
   finalize:
     timeout-minutes: 10
     needs:
       - unit-tests
+      - example-pull-gcr
     # Important: the next line MUST be `if: always()`.
     # Do not change that line.
     # That line is necessary to make sure that this job runs even if tests fail.
@@ -24,11 +29,13 @@ jobs:
     steps:
       - run: |
           echo unit-tests: ${{ needs.unit-tests.result }}
+          echo example-pull-gcr: ${{ needs.example-pull-gcr.result }}
       - run: exit 1
         # The last line must NOT end with ||
         # All other lines MUST end with ||
         if: |
-          (needs.unit-tests.result != 'success')
+          (needs.unit-tests.result != 'success') ||
+          (needs.example-pull-gcr.result != 'success')
   unit-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -121,3 +128,30 @@ jobs:
         # If this PR is NOT from a fork, then DO fail CI if the Codecov upload errors.
         # If this is not a PR, then DO fail CI if the Codecov upload errors.
         fail_ci_if_error: ${{ github.event_name != 'pull_request' || github.repository == github.event.pull_request.head.repo.full_name }}
+  example-pull-gcr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        persist-credentials: false
+    - name: Print Docker version
+      run: |
+        docker --version
+        docker version
+    # - uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+    #   if: false
+    #   with:
+    #     registry: ghcr.io
+    #     username: ${{ github.actor }}
+    #     password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Docker pull
+      run: |
+        docker pull "ghcr.io/${MY_GCR_NAMESPACE:?}/${MY_GCR_IMAGENAME:?}@${MY_DIGEST_HTCONDOR_EXECUTE:?}"
+      env:
+        # We intentionally pull by full-length digest (NOT tag) for reproducibility:
+        MY_DIGEST_HTCONDOR_EXECUTE: 'sha256:d4384c19cdb2f26bae15b1feef3a12bde66554658562df2626c03ae870003555' # htcondor-execute
+    - name: List images
+      run: |
+        docker ps -a
+        docker images
