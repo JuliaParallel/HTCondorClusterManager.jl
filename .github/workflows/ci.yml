@@ -145,8 +145,13 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-      - run: docker push "ghcr.io/${MY_GCR_NAMESPACE:?}/${MY_GCR_IMAGENAME:?}:${MATRIX_CLUSTERMANAGER:?}"
-      - name: List images
-        run: |
-          docker ps -a
-          docker images
+    - name: Docker pull
+      run: docker pull "ghcr.io/${MY_GCR_NAMESPACE:?}/${MY_GCR_IMAGENAME:?}@${MY_DIGEST_HTCONDOR_EXECUTE:?}"
+      env:
+        # dask-jobqueue-ci-images:htcondor-execute
+        MY_DIGEST_HTCONDOR_EXECUTE: 'sha256:d4384c19cdb2f26bae15b1feef3a12bde66554658562df2626c03ae870003555'
+        # We intentionally pull by digest (NOT tag) for reproducibility.
+    - name: List images
+      run: |
+        docker ps -a
+        docker images
