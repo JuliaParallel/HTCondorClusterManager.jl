@@ -1,4 +1,4 @@
-name = "ClusterManagers"
+name = "HTCondorClusterManager"
 uuid = "1076c17b-1fcc-416f-99d3-1c6bb2eb7749"
 version = "1.1.0"
 
