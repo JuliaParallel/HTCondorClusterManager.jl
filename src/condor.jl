@@ -68,7 +68,11 @@ function launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Cond
 
         script = condor_script(portnum, np, params)
         cmd = `condor_submit $script`
-        if !success(cmd)
+        proc = run(ignorestatus(cmd); wait=false) # run and wait (blocks)
+        while !Base.process_exited(proc)
+            run(`condor_q`)
+        end
+        if !success(proc)
             println("batch queue not available (could not run condor_submit)")
             return
         end

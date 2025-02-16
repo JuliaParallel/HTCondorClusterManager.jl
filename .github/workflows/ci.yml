@@ -19,8 +19,7 @@ jobs:
   finalize:
     timeout-minutes: 10
     needs:
-      - unit-tests
-      - example-pull-gcr
+      - test-htc
     # Important: the next line MUST be `if: always()`.
     # Do not change that line.
     # That line is necessary to make sure that this job runs even if tests fail.
@@ -28,46 +27,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo unit-tests: ${{ needs.unit-tests.result }}
-          echo example-pull-gcr: ${{ needs.example-pull-gcr.result }}
+          echo test-htc: ${{ needs.test-htc.result }}
       - run: exit 1
         # The last line must NOT end with ||
         # All other lines MUST end with ||
         if: |
-          (needs.unit-tests.result != 'success') ||
-          (needs.example-pull-gcr.result != 'success')
-  unit-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        version:
-          - '1.2'  # minimum Julia version supported in Project.toml
-          - '1.6'  # previous LTS
-          - '1.10' # current LTS
-          - '1'    # automatically expands to the latest stable 1.x release of Julia
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-    - uses: julia-actions/setup-julia@v2
-      with:
-        version: ${{ matrix.version }}
-    - uses: julia-actions/julia-runtest@v1
-    - run: find . -type f -name '*.cov'
-    # - run: find . -type f -name '*.c  ov' -exec cat {} \;
-    - uses: julia-actions/julia-processcoverage@v1
-    - uses: codecov/codecov-action@v5
-      with:
-        files: lcov.info
-        token: ${{ secrets.CODECOV_TOKEN }}
-        # If this PR is from a fork, then do NOT fail CI if the Codecov upload errors.
-        # If this PR is NOT from a fork, then DO fail CI if the Codecov upload errors.
-        # If this is not a PR, then DO fail CI if the Codecov upload errors.
-        fail_ci_if_error: ${{ github.event_name != 'pull_request' || github.repository == github.event.pull_request.head.repo.full_name }}
-  test-slurm:
-    if: false
+          (needs.test-htc.result != 'success')
+  test-htc:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -76,82 +42,47 @@ jobs:
         version:
           # Please note: You must specify the full Julia version number (major.minor.patch).
           # This is because the value here will be directly interpolated into a download URL.
-          # - '1.2.0'  # minimum Julia version supported in Project.toml
+          - '1.0.5'  # minimum Julia version supported in Project.toml
           - '1.6.7'  # previous LTS
           - '1.10.7' # current LTS
           - '1.11.2' # currently the latest stable release
     steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-    - name: Print Docker version
-      run: |
-        docker --version
-        docker version
-    # This next bit of code is taken from:
-    # https://github.com/kleinhenz/SlurmClusterManager.jl
-    # Original author: Joseph Kleinhenz
-    # License: MIT
-    - name: Setup Slurm inside Docker
-      run: |
-        docker version
-        docker compose version
-        docker build --build-arg "JULIA_VERSION=${MATRIX_JULIA_VERSION:?}" -t slurm-cluster-julia -f ci/Dockerfile .
-        docker compose -f ci/docker-compose.yml up -d
-        docker ps
-      env:
-        MATRIX_JULIA_VERSION: ${{matrix.version}}
-    - name: Print some information for debugging purposes
-      run: |
-        docker exec -t slurmctld pwd
-        docker exec -t slurmctld ls -la
-        docker exec -t slurmctld ls -la HTCondorClusterManager
-    - name: Instantiate package
-      run: docker exec -t slurmctld julia --project=HTCondorClusterManager -e 'import Pkg; @show Base.active_project(); Pkg.instantiate(); Pkg.status()'
-    - name: Run tests without a Slurm allocation
-      run: docker exec -t slurmctld julia --project=HTCondorClusterManager -e 'import Pkg; Pkg.test(; test_args=["slurm"])'
-    - name: Run tests inside salloc
-      run: docker exec -t slurmctld salloc -t 00:10:00 -n 2 julia --project=HTCondorClusterManager -e 'import Pkg; Pkg.test(; test_args=["slurm"], coverage=true)'
-    - name: Run tests inside sbatch
-      run: docker exec -t slurmctld HTCondorClusterManager/ci/run_my_sbatch.sh
-    - run: find . -type f -name '*.cov'
-    - name: Copy .cov files out of the Docker container
-      run: docker exec slurmctld /bin/bash -c 'cd /home/docker/HTCondorClusterManager && tar -cf - src/*.cov' | tar -xvf -
-    - run: find . -type f -name '*.cov'
-    # - run: find . -type f -name '*.cov' -exec cat {} \;
-    - uses: julia-actions/julia-processcoverage@v1
-    - uses: codecov/codecov-action@v5
-      with:
-        files: lcov.info
-        token: ${{ secrets.CODECOV_TOKEN }}
-        # If this PR is from a fork, then do NOT fail CI if the Codecov upload errors.
-        # If this PR is NOT from a fork, then DO fail CI if the Codecov upload errors.
-        # If this is not a PR, then DO fail CI if the Codecov upload errors.
-        fail_ci_if_error: ${{ github.event_name != 'pull_request' || github.repository == github.event.pull_request.head.repo.full_name }}
-  example-pull-gcr:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        persist-credentials: false
-    - name: Print Docker version
-      run: |
-        docker --version
-        docker version
-    # - uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
-    #   if: false
-    #   with:
-    #     registry: ghcr.io
-    #     username: ${{ github.actor }}
-    #     password: ${{ secrets.GITHUB_TOKEN }}
-    - name: Docker pull
-      run: |
-        docker pull "ghcr.io/${MY_GCR_NAMESPACE:?}/${MY_GCR_IMAGENAME:?}@${MY_DIGEST_HTCONDOR_EXECUTE:?}"
-      env:
-        # We intentionally pull by full-length digest (NOT tag) for reproducibility:
-        MY_DIGEST_HTCONDOR_EXECUTE: 'sha256:d4384c19cdb2f26bae15b1feef3a12bde66554658562df2626c03ae870003555' # htcondor-execute
-    - name: List images
-      run: |
-        docker ps -a
-        docker images
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+      - run: docker version
+      - run: docker compose version
+      - run: docker compose pull
+        working-directory: ci/htcondor
+      - run: docker compose build --build-arg JULIA_VERSION="${MATRIX_VERSION:?}"
+        working-directory: ci/htcondor
+        env:
+          MATRIX_VERSION: ${{matrix.version}}
+      - run: ./start-htcondor.sh
+        working-directory: ci/htcondor
+      - run: docker compose exec -T --user submituser submit condor_submit --help
+        working-directory: ci/htcondor
+      - run: docker compose exec -T --user submituser submit julia --version
+        working-directory: ci/htcondor
+      - run: docker compose exec -T --user submituser submit julia --project=/SlurmClusterManager -e 'import Pkg; Pkg.test()'
+        working-directory: ci/htcondor
+      - run: find . -type f -name '*.cov'
+      - name: Copy .cov files out of the Docker container
+        run: |
+          # docker compose exec -T --user submituser submit /bin/bash -c 'cd ~/HTCondorClusterManager && tar -cf - src/*.cov' | tar -xvf -
+          docker compose exec -T --user submituser execute1 /bin/bash -c 'cd ~/HTCondorClusterManager && tar -cf - src/*.cov' | tar -xvf -
+          # docker compose exec -T --user submituser execute2 /bin/bash -c 'cd ~/HTCondorClusterManager && tar -cf - src/*.cov' | tar -xvf -
+      - run: find . -type f -name '*.cov'
+      # - run: find . -type f -name '*.cov' -exec cat {} \;
+      - uses: julia-actions/julia-processcoverage@v1
+      - uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          # If this PR is from a fork, then do NOT fail CI if the Codecov upload errors.
+          # If this PR is NOT from a fork, then DO fail CI if the Codecov upload errors.
+          # If this is not a PR, then DO fail CI if the Codecov upload errors.
+          fail_ci_if_error: ${{ github.event_name != 'pull_request' || github.repository == github.event.pull_request.head.repo.full_name }}
