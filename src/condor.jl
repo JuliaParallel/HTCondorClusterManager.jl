@@ -55,9 +55,9 @@ function launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Cond
     let
         mgr_desc = "HTCondor"
         msg = "The $(mgr_desc) functionality in ClusterManagers.jl is currently not actively maintained. " *
-              "We are currently looking for a new maintainer. " * 
+              "We are currently looking for a new maintainer. " *
               "If you are an active user of the $(mgr_desc) functionality and are interested in becoming the maintainer, " *
-              "Please open an issue on the JuliaParallel/ClusterManagers.jl repo: " * 
+              "Please open an issue on the JuliaParallel/ClusterManagers.jl repo: " *
               "https://github.com/JuliaParallel/ClusterManagers.jl/issues"
         Base.depwarn(msg, Symbol(typeof(manager)))
     end

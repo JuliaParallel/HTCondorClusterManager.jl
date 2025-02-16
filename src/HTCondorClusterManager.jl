@@ -1,4 +1,4 @@
-module ClusterManagers
+module HTCondorClusterManager
 
 using Distributed
 using Sockets
