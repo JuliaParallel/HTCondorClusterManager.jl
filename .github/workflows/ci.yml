@@ -139,18 +139,18 @@ jobs:
       run: |
         docker --version
         docker version
-    - uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
-      if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+    # - uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+    #   if: false
+    #   with:
+    #     registry: ghcr.io
+    #     username: ${{ github.actor }}
+    #     password: ${{ secrets.GITHUB_TOKEN }}
     - name: Docker pull
-      run: docker pull "ghcr.io/${MY_GCR_NAMESPACE:?}/${MY_GCR_IMAGENAME:?}@${MY_DIGEST_HTCONDOR_EXECUTE:?}"
+      run: |
+        docker pull "ghcr.io/${MY_GCR_NAMESPACE:?}/${MY_GCR_IMAGENAME:?}@${MY_DIGEST_HTCONDOR_EXECUTE:?}"
       env:
-        # dask-jobqueue-ci-images:htcondor-execute
-        MY_DIGEST_HTCONDOR_EXECUTE: 'sha256:d4384c19cdb2f26bae15b1feef3a12bde66554658562df2626c03ae870003555'
-        # We intentionally pull by digest (NOT tag) for reproducibility.
+        # We intentionally pull by full-length digest (NOT tag) for reproducibility:
+        MY_DIGEST_HTCONDOR_EXECUTE: 'sha256:d4384c19cdb2f26bae15b1feef3a12bde66554658562df2626c03ae870003555' # htcondor-execute
     - name: List images
       run: |
         docker ps -a
