@@ -10,7 +10,7 @@ using Distributed: procs, nprocs
 using Distributed: remotecall_fetch, @spawnat
 using Test: @testset, @test, @test_skip
 
-using HTCondorClusterManager: addprocs_sge, SGEManager
+using HTCondorClusterManager: addprocs_htc, HTCManager
 
 @testset "HTCondorClusterManager.jl" begin
     include("elastic.jl")
