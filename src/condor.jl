@@ -51,6 +51,19 @@ function condor_script(portnum::Integer, np::Integer, params::Dict)
     "$tdir/$jobname.sub"
 end
 
+function _my_wait_without_timeout(f::Function; timeout_seconds)
+    each_sleep_duration = 5
+    for i = 1:each_sleep_duration:timeout_seconds
+        sleep(each_sleep_duration)
+        result = f()
+        if result
+            return nothing
+        end
+    end
+    msg = "Timeout ($(timeout_seconds) seconds) exceeded"
+    error(msg)
+end
+
 function launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Condition)
     let
         mgr_desc = "HTCondor"
@@ -68,9 +81,22 @@ function launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Cond
 
         script = condor_script(portnum, np, params)
         cmd = `condor_submit $script`
-        if !success(cmd)
-            println("batch queue not available (could not run condor_submit)")
-            return
+        pipeline = Base.pipeline(ignorestatus(cmd); stdout=Base.stdout, stderr=Base.stderr)
+        proc = run(pipeline; wait = false)
+        _my_wait_without_timeout(; timeout_seconds = 5 * 60) do
+            @info "condor_q:"
+            run(`condor_q`)
+            @info "condor_status:"
+            run(`condor_status`)
+            Base.process_exited(proc)
+        end
+        if !Base.process_exited(proc)
+            @error "batch queue not available (could not run condor_submit)" Base.process_exited(proc)
+            return nothing
+        end
+        if !success(proc)
+            @error "batch queue not available (could not run condor_submit)" Base.process_exited(proc) success(proc)
+            return nothing
         end
         print("Waiting for $np workers: ")
 
@@ -86,9 +112,12 @@ function launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Cond
         end
         println(".")
 
-   catch e
+   catch ex
+        bt = catch_backtrace()
+        @error "Error launching HTCondor" exception=(ex,bt)
+        # @error "Error launching HTCondor" exception=ex
         println("Error launching condor")
-        println(e)
+        println(ex)
    end
 end
 

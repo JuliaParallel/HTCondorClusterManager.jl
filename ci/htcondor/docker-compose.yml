@@ -1,0 +1,77 @@
+# This file is based on:
+# https://github.com/dask/dask-jobqueue/blob/main/ci/htcondor/docker-compose.yml
+# License: BSD 3-Clause
+
+# version: "3.4"
+
+services:
+  cm:
+    # We intentionally use full-length digests (NOT tags) for reproducibility.
+    #
+    # TODO: mirror this images in our own GCR, instead of needing it to exist in Docker Hub.
+    # image: htcondor/cm:el7
+    image: htcondor/cm@sha256:71cfed5ffc1dc78cb725f571e6be6acdb50ca0322c9cc9cd500a965be7e402c6
+    hostname: cm.htcondor
+    environment:
+      - USE_POOL_PASSWORD=yes
+    volumes:
+      - secrets:/root/secrets
+      - ./condor_config.local:/etc/condor/condor_config.local
+    command: bash -c 'condor_store_cred -p password -f /root/secrets/pool_password ; exec bash -x /start.sh'
+
+  submit:
+    # image: ghcr.io/juliaparallel/dask-jobqueue-ci-images@sha256:5ada6445b5d8b53b6693ab86be364dd1ce385ada8e53763731ba50d145f0350d
+    build:
+      context: ../..
+      dockerfile: ci/htcondor/Dockerfile
+      target: submit
+    hostname: submit.htcondor
+    environment:
+      - CONDOR_HOST=cm
+      - USE_POOL_PASSWORD=yes
+      - CI_SHARED_SPACE=/shared_space
+    depends_on:
+      - cm
+    volumes:
+      - secrets:/root/secrets
+      - ../..:/dask-jobqueue
+      - ./condor_config.local:/etc/condor/condor_config.local
+      - shared_space:/shared_space
+
+  execute1:
+    # image: ghcr.io/juliaparallel/dask-jobqueue-ci-images@sha256:5723d0380f627779bc54a31ebac9a77f0937189453f597845411257dea6ac0db
+    build:
+      context: ../..
+      dockerfile: ci/htcondor/Dockerfile
+      target: execute
+    hostname: execute1.htcondor
+    environment:
+      - CONDOR_HOST=cm
+      - USE_POOL_PASSWORD=yes
+    depends_on:
+      - cm
+    volumes:
+      - secrets:/root/secrets
+      - ./condor_config.local:/etc/condor/condor_config.local
+      - shared_space:/shared_space
+
+  execute2:
+    # image: ghcr.io/juliaparallel/dask-jobqueue-ci-images@sha256:5723d0380f627779bc54a31ebac9a77f0937189453f597845411257dea6ac0db
+    build:
+      context: ../..
+      dockerfile: ci/htcondor/Dockerfile
+      target: execute
+    hostname: execute2.htcondor
+    environment:
+      - CONDOR_HOST=cm
+      - USE_POOL_PASSWORD=yes
+    depends_on:
+      - cm
+    volumes:
+      - secrets:/root/secrets
+      - ./condor_config.local:/etc/condor/condor_config.local
+      - shared_space:/shared_space
+
+volumes:
+  secrets:
+  shared_space:
