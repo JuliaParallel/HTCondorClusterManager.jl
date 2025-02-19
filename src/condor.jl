@@ -84,8 +84,11 @@ function launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Cond
         pipeline = Base.pipeline(ignorestatus(cmd); stdout=Base.stdout, stderr=Base.stderr)
         proc = run(pipeline; wait = false)
         _my_wait_without_timeout(; timeout_seconds = 5 * 60) do
+            @info "condor_q:"
             run(`condor_q`)
-            return 
+            @info "condor_status:"
+            run(`condor_status`)
+            Base.process_exited(proc)
         end
         if !Base.process_exited(proc)
             @error "batch queue not available (could not run condor_submit)" Base.process_exited(proc)
@@ -109,7 +112,10 @@ function launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Cond
         end
         println(".")
 
-   catch e
+   catch ex
+        bt = catch_backtrace()
+        @error "Error launching HTCondor" exception=(ex,bt)
+        # @error "Error launching HTCondor" exception=ex
         println("Error launching condor")
         println(e)
    end
