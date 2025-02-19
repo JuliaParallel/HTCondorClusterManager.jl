@@ -2,7 +2,7 @@
 
 export HTCManager, addprocs_htc
 
-struct HTCManager <: ClusterManager
+struct HTCManager <: Distributed.ClusterManager
     np::Integer
 end
 
@@ -51,7 +51,7 @@ function condor_script(portnum::Integer, np::Integer, params::Dict)
     "$tdir/$jobname.sub"
 end
 
-function launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Condition)
+function Distributed.launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Condition)
     let
         mgr_desc = "HTCondor"
         msg = "The $(mgr_desc) functionality in ClusterManagers.jl is currently not actively maintained. " *
@@ -63,7 +63,7 @@ function launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Cond
     end
     try
         portnum = rand(8000:9000)
-        portnum, server = listenany(ip"0.0.0.0", portnum)
+        portnum, server = listenany(Distributed.ip"0.0.0.0", portnum)
         np = manager.np
 
         script = condor_script(portnum, np, params)
@@ -76,7 +76,7 @@ function launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Cond
 
         for i=1:np
             conn = accept(server)
-            config = WorkerConfig()
+            config = Distributed.WorkerConfig()
 
             config.io = conn
 
@@ -92,12 +92,12 @@ function launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Cond
    end
 end
 
-function kill(manager::HTCManager, id::Int64, config::WorkerConfig)
+function Distributed.kill(manager::HTCManager, id::Int64, config::Distributed.WorkerConfig)
     remotecall(exit,id)
     close(config.io)
 end
 
-function manage(manager::HTCManager, id::Integer, config::WorkerConfig, op::Symbol)
+function Distributed.manage(manager::HTCManager, id::Integer, config::Distributed.WorkerConfig, op::Symbol)
     if op == :finalize
         if !isnothing(config.io)
             close(config.io)
