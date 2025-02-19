@@ -117,7 +117,7 @@ function launch(manager::HTCManager, params::Dict, instances_arr::Array, c::Cond
         @error "Error launching HTCondor" exception=(ex,bt)
         # @error "Error launching HTCondor" exception=ex
         println("Error launching condor")
-        println(e)
+        println(ex)
    end
 end
 
